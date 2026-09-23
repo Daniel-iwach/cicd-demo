@@ -55,7 +55,7 @@ class TaskServiceImplTest {
         TaskResponseDTO result = taskService.create(request);
 
         assertThat(result.getId()).isEqualTo(1L);
-        assertThat(result.getTitle()).isEqualTo("Write tests");
+        assertThat(result.getTitle()).isEqualTo("Write test");
         assertThat(result.getStatus()).isEqualTo(TaskStatus.PENDING);
         verify(taskRepository, times(1)).save(any(Task.class));
     }
