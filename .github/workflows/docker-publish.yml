@@ -1,0 +1,61 @@
+# Builds the Docker image and pushes it to Docker Hub,
+# but ONLY after the "Java CI with Maven" workflow finished successfully on main.
+#
+# Required repository secrets (Settings > Secrets and variables > Actions):
+#   DOCKERHUB_USERNAME -> your Docker Hub username
+#   DOCKERHUB_TOKEN    -> a Docker Hub access token with Read & Write permission
+
+name: Docker Build and Push
+
+on:
+  workflow_run:
+    # Must match the "name:" of the CI workflow exactly
+    workflows: ["Java CI with Maven"]
+    types: [completed]
+    branches: [main]
+
+env:
+  IMAGE_NAME: cicd-demo-app
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    # Only continue if the CI workflow passed AND it was triggered by a push (not a pull request)
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push'
+
+    steps:
+      # Checkout the exact commit that the CI workflow validated
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Compute short SHA
+        id: vars
+        run: echo "short_sha=$(echo '${{ github.event.workflow_run.head_sha }}' | cut -c1-7)" >> "$GITHUB_OUTPUT"
+
+      # Pushes two tags: "latest" and the short commit SHA (useful to roll back to a specific version)
+      - name: Build and push
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.short_sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
