@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Tareas</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&display=swap" rel="stylesheet">
+    <style>
+        :root{
+          --bg:#eef1f6; --surface:#fff; --ink:#1b2333; --muted:#6b7488; --line:#dbe0ea;
+          --accent:#2f5bea; --accent-ink:#fff;
+          --todo:#6b7488; --progress:#b7791f; --done:#2e8b62; --danger:#c93b3b;
+          --font:"Bricolage Grotesque",system-ui,-apple-system,"Segoe UI",sans-serif;
+        }
+        @media (prefers-color-scheme:dark){
+          :root{--bg:#121722; --surface:#1a2130; --ink:#e8ecf5; --muted:#939bb0; --line:#2b3448;
+            --accent:#6c8cff; --accent-ink:#0f1524; --todo:#939bb0; --progress:#e0a640; --done:#52c496; --danger:#ff7676;}
+        }
+        *{box-sizing:border-box}
+        html,body{margin:0}
+        body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:100vh;line-height:1.45}
+        button,input,select,textarea{font:inherit;color:inherit}
+        :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+        .wrap{max-width:1120px;margin:0 auto;padding:32px 20px 64px}
+        header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:24px}
+        h1{margin:0;font-size:clamp(2rem,5vw,3.25rem);font-weight:800;letter-spacing:-.03em;line-height:1}
+        .sub{color:var(--muted);margin:8px 0 0}
+
+        .btn{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:9px 16px;cursor:pointer;font-weight:600;transition:background .15s,border-color .15s}
+        .btn:hover{border-color:var(--muted)}
+        .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+        .btn.primary:hover{filter:brightness(1.08)}
+        .btn.danger{color:var(--danger)}
+        .btn.small{padding:5px 10px;font-size:.85rem;border-radius:8px}
+
+        .filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px}
+        .chip{border:1px solid var(--line);background:transparent;border-radius:999px;padding:6px 14px;cursor:pointer;font-weight:600;color:var(--muted)}
+        .chip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+
+        .board{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;align-items:start}
+        @media (max-width:820px){.board{grid-template-columns:1fr}}
+        .col{background:color-mix(in srgb,var(--surface) 55%,transparent);border-radius:16px;padding:14px;border-top:4px solid var(--c)}
+        .col h2{margin:2px 4px 12px;font-size:1.05rem;display:flex;justify-content:space-between;align-items:center}
+        .count{font-size:.85rem;color:var(--muted);font-weight:600}
+        .empty{color:var(--muted);text-align:center;padding:22px 8px;font-size:.95rem;border:1px dashed var(--line);border-radius:12px}
+
+        .card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+        .card h3{margin:0 0 4px;font-size:1.05rem;overflow-wrap:anywhere}
+        .card p{margin:0 0 12px;color:var(--muted);font-size:.93rem;overflow-wrap:anywhere;white-space:pre-wrap}
+        .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+        .row .grow{flex:1}
+        select.status{border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:5px 8px;font-size:.85rem;cursor:pointer}
+
+        dialog{border:none;border-radius:16px;padding:0;width:min(460px,92vw);background:var(--surface);color:var(--ink);box-shadow:0 20px 60px rgba(0,0,0,.3)}
+        dialog::backdrop{background:rgba(10,14,24,.55)}
+        form{padding:24px;display:grid;gap:14px}
+        form h2{margin:0;font-size:1.4rem}
+        label{display:grid;gap:6px;font-weight:600;font-size:.92rem}
+        input,textarea,select{border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:10px 12px;width:100%}
+        textarea{resize:vertical;min-height:90px}
+        .actions{display:flex;justify-content:flex-end;gap:8px;margin-top:4px}
+        .field-error{color:var(--danger);font-size:.85rem;font-weight:400;min-height:1em}
+
+        #toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,20px);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:10px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:10;max-width:90vw}
+        #toast.show{opacity:1;transform:translate(-50%,0)}
+        #toast.error{background:var(--danger);color:#fff}
+        .banner{background:color-mix(in srgb,var(--danger) 12%,var(--surface));border:1px solid var(--danger);color:var(--danger);padding:12px 16px;border-radius:12px;margin-bottom:20px}
+        @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+    </style>
+</head>
+<body>
+<div class="wrap">
+    <header>
+        <div>
+            <h1>Tareas</h1>
+            <p class="sub" id="summary">Cargando…</p>
+        </div>
+        <button class="btn primary" id="newBtn">Nueva tarea</button>
+    </header>
+
+    <div id="banner" class="banner" hidden></div>
+    <div class="filters" id="filters" role="group" aria-label="Filtrar por estado"></div>
+    <main class="board" id="board"></main>
+</div>
+
+<dialog id="dlg">
+    <form id="form" novalidate>
+        <h2 id="dlgTitle">Nueva tarea</h2>
+        <label>Título
+            <input id="fTitle" required maxlength="120" autocomplete="off">
+            <span class="field-error" id="errTitle"></span>
+        </label>
+        <label>Descripción
+            <textarea id="fDesc" maxlength="500"></textarea>
+        </label>
+        <label>Estado
+            <select id="fStatus"></select>
+        </label>
+        <div class="actions">
+            <button type="button" class="btn" id="cancelBtn">Cancelar</button>
+            <button type="submit" class="btn primary" id="saveBtn">Guardar tarea</button>
+        </div>
+    </form>
+</dialog>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+    /* ============ CONFIGURACIÓN ============ */
+    // Si este archivo lo servís desde Spring Boot (src/main/resources/static/index.html) dejá ''.
+    // Si lo abrís aparte, poné la URL del backend, ej: 'http://localhost:8080' (y habilitá CORS).
+    const API_BASE = '';
+    const API = API_BASE + '/api/v1/tasks';
+
+    // Valores del enum TaskStatus del backend: PENDING, IN_PROGRESS, COMPLETED.
+    const STATUSES = [
+      { value: 'PENDING',     label: 'Pendiente',   color: 'var(--todo)' },
+      { value: 'IN_PROGRESS', label: 'En progreso', color: 'var(--progress)' },
+      { value: 'COMPLETED',   label: 'Completada',  color: 'var(--done)' }
+    ];
+    // Nombres de campos del DTO (ajustalos si difieren).
+    const F = { title: 'title', description: 'description', status: 'status' };
+    /* ======================================= */
+
+    const $ = id => document.getElementById(id);
+    const board = $('board'), dlg = $('dlg'), form = $('form');
+    let tasks = [], filter = '', editingId = null;
+
+    /* ---------- API ---------- */
+    async function api(path = '', options = {}) {
+      const res = await fetch(API + path, {
+        headers: { 'Content-Type': 'application/json' },
+        ...options
+      });
+      if (!res.ok) {
+        let msg = 'Error ' + res.status;
+        try {
+          const body = await res.json();
+          msg = body.message || body.detail || body.error || msg;
+          if (body.errors) msg += ': ' + JSON.stringify(body.errors);
+        } catch (_) {}
+        throw new Error(msg);
+      }
+      return res.status === 204 ? null : res.json();
+    }
+
+    async function load() {
+      try {
+        tasks = await api(filter ? '?status=' + encodeURIComponent(filter) : '');
+        $('banner').hidden = true;
+      } catch (e) {
+        tasks = [];
+        const b = $('banner');
+        b.hidden = false;
+        b.textContent = 'No se pudo conectar con el backend (' + e.message + '). Revisá que esté corriendo en ' + (API_BASE || 'este mismo origen') + ' y que CORS esté habilitado.';
+      }
+      render();
+    }
+
+    /* ---------- Render ---------- */
+    function esc(s) {
+      const d = document.createElement('div');
+      d.textContent = s ?? '';
+      return d.innerHTML;
+    }
+
+    function renderFilters() {
+      const items = [{ value: '', label: 'Todas' }, ...STATUSES];
+      $('filters').innerHTML = items.map(s =>
+        `<button class="chip" data-f="${s.value}" aria-pressed="${filter === s.value}">${s.label}</button>`
+      ).join('');
+    }
+
+    function render() {
+      renderFilters();
+      const n = tasks.length;
+      $('summary').textContent = n === 0 ? 'No hay tareas para mostrar' : n + (n === 1 ? ' tarea' : ' tareas');
+
+      const cols = filter ? STATUSES.filter(s => s.value === filter) : STATUSES;
+      board.style.gridTemplateColumns = filter ? '1fr' : '';
+      board.innerHTML = cols.map(s => {
+        const list = tasks.filter(t => t[F.status] === s.value);
+        const cards = list.length
+          ? list.map(card).join('')
+          : `<div class="empty">Sin tareas en “${s.label.toLowerCase()}”</div>`;
+        return `<section class="col" style="--c:${s.color}">
+          <h2>${s.label}<span class="count">${list.length}</span></h2>${cards}</section>`;
+      }).join('');
+    }
+
+    function card(t) {
+      const opts = STATUSES.map(s =>
+        `<option value="${s.value}" ${s.value === t[F.status] ? 'selected' : ''}>${s.label}</option>`).join('');
+      return `<article class="card" data-id="${t.id}">
+        <h3>${esc(t[F.title])}</h3>
+        ${t[F.description] ? `<p>${esc(t[F.description])}</p>` : ''}
+        <div class="row">
+          <select class="status" data-act="status" aria-label="Cambiar estado">${opts}</select>
+          <span class="grow"></span>
+          <button class="btn small" data-act="edit">Editar</button>
+          <button class="btn small danger" data-act="delete">Eliminar</button>
+        </div>
+      </article>`;
+    }
+
+    /* ---------- Modal ---------- */
+    function openForm(task) {
+      editingId = task ? task.id : null;
+      $('dlgTitle').textContent = task ? 'Editar tarea' : 'Nueva tarea';
+      $('fTitle').value = task ? task[F.title] : '';
+      $('fDesc').value = task ? (task[F.description] || '') : '';
+      $('fStatus').innerHTML = STATUSES.map(s => `<option value="${s.value}">${s.label}</option>`).join('');
+      $('fStatus').value = task ? task[F.status] : STATUSES[0].value;
+      $('errTitle').textContent = '';
+      dlg.showModal();
+      $('fTitle').focus();
+    }
+
+    form.addEventListener('submit', async e => {
+      e.preventDefault();
+      const title = $('fTitle').value.trim();
+      if (!title) { $('errTitle').textContent = 'Escribí un título para la tarea.'; return; }
+      const body = {
+        [F.title]: title,
+        [F.description]: $('fDesc').value.trim(),
+        [F.status]: $('fStatus').value
+      };
+      $('saveBtn').disabled = true;
+      try {
+        if (editingId) { await api('/' + editingId, { method: 'PUT', body: JSON.stringify(body) }); toast('Tarea actualizada'); }
+        else { await api('', { method: 'POST', body: JSON.stringify(body) }); toast('Tarea creada'); }
+        dlg.close();
+        load();
+      } catch (err) { toast(err.message, true); }
+      finally { $('saveBtn').disabled = false; }
+    });
+
+    $('cancelBtn').onclick = () => dlg.close();
+    $('newBtn').onclick = () => openForm();
+    dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
+
+    /* ---------- Acciones ---------- */
+    board.addEventListener('click', async e => {
+      const btn = e.target.closest('[data-act]');
+      if (!btn || btn.tagName === 'SELECT') return;
+      const id = btn.closest('.card').dataset.id;
+      const task = tasks.find(t => String(t.id) === id);
+      if (btn.dataset.act === 'edit') openForm(task);
+      if (btn.dataset.act === 'delete') {
+        if (!confirm('¿Eliminar “' + task[F.title] + '”? Esta acción no se puede deshacer.')) return;
+        try { await api('/' + id, { method: 'DELETE' }); toast('Tarea eliminada'); load(); }
+        catch (err) { toast(err.message, true); }
+      }
+    });
+
+    board.addEventListener('change', async e => {
+      if (e.target.dataset.act !== 'status') return;
+      const id = e.target.closest('.card').dataset.id;
+      const task = tasks.find(t => String(t.id) === id);
+      const body = { [F.title]: task[F.title], [F.description]: task[F.description] || '', [F.status]: e.target.value };
+      try { await api('/' + id, { method: 'PUT', body: JSON.stringify(body) }); toast('Estado actualizado'); load(); }
+      catch (err) { toast(err.message, true); load(); }
+    });
+
+    $('filters').addEventListener('click', e => {
+      const chip = e.target.closest('.chip');
+      if (!chip) return;
+      filter = chip.dataset.f;
+      load();
+    });
+
+    /* ---------- Toast ---------- */
+    let tt;
+    function toast(msg, isError = false) {
+      const t = $('toast');
+      t.textContent = msg;
+      t.className = 'show' + (isError ? ' error' : '');
+      clearTimeout(tt);
+      tt = setTimeout(() => t.className = '', 3200);
+    }
+
+    load();
+</script>
+</body>
+</html>
