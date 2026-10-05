@@ -1,0 +1,28 @@
+apiVersion: apps/v1                  # Versión de la API de Kubernetes para este tipo de recurso.
+# Los Deployments viven en el grupo "apps", versión v1.
+kind: Deployment                     # Qué tipo de recurso es: un Deployment (gestiona pods).
+metadata:                            # Datos de identificación del recurso.
+  name: cicd-demo-app                # Nombre del Deployment. Es lo que usás en kubectl
+  # (kubectl rollout status deployment/cicd-demo-app).
+spec:                                # El estado deseado: lo que querés que exista.
+  replicas: 2                        # Cuántos pods iguales mantener corriendo.
+  # Si uno muere, Kubernetes crea otro.
+  selector:                          # Cómo el Deployment reconoce cuáles pods son "suyos".
+    matchLabels:
+      app: cicd-demo-app             # Gestiona los pods que tengan la etiqueta app=cicd-demo-app.
+  template:                          # Plantilla con la que se crea cada pod.
+    metadata:
+      labels:
+        app: cicd-demo-app           # Etiqueta que se le pone a cada pod.
+        # DEBE coincidir con el selector de arriba.
+    spec:                            # Especificación del pod.
+      containers:  # Lista de contenedores del pod (acá hay uno).
+        - name: cicd-demo-app        # Nombre del contenedor dentro del pod.
+          image: danieliwach/cicd-demo-app:latest   # Imagen de Docker Hub a ejecutar.
+          ports:
+            - containerPort: 8080    # Puerto en el que escucha tu app Java dentro del contenedor.
+
+          envFrom:                   # Carga variables de entorno en bloque desde otro recurso.
+            - secretRef:
+                name: db-secret      # Toma TODAS las claves del Secret "db-secret"
+                # y las convierte en variables de entorno.
