@@ -1,4 +1,4 @@
-name: Deploy to Production
+name: Deploy to Kubernetes
 
 on:
   workflow_run:
@@ -10,16 +10,33 @@ jobs:
   deploy:
     runs-on: self-hosted
 
-    if: >
-      github.event.workflow_run.conclusion == 'success'
+    if: github.event.workflow_run.conclusion == 'success'
 
     steps:
-      - name: Update containers on the server
-        run: |
-          cd /home/vboxuser/java-proyect
+      # Baja el repo en el commit exacto que pasó el CI (para tener la carpeta k8s/)
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
 
-          docker compose -f docker-compose.prod.yml pull
-          
-          docker compose -f docker-compose.prod.yml up -d
-          
-          docker image prune -f
+      # Mismo SHA corto que usa docker-publish.yml para taguear la imagen
+      - name: Compute short SHA
+        id: vars
+        run: echo "short_sha=$(echo '${{ github.event.workflow_run.head_sha }}' | cut -c1-7)" >> "$GITHUB_OUTPUT"
+
+      # Cambia :latest por el tag del commit dentro del manifest
+      - name: Set image tag in manifest
+        run: |
+          sed -i "s|danieliwach/cicd-demo-app:.*|danieliwach/cicd-demo-app:${{ steps.vars.outputs.short_sha }}|" k8s/deployment.yaml
+          grep "image:" k8s/deployment.yaml
+
+      # Kubernetes detecta el cambio y hace el rolling update
+      - name: Apply manifests
+        run: kubectl apply -f k8s/
+
+      # Falla el job si los pods nuevos no levantan
+      - name: Wait for rollout
+        run: kubectl rollout status deployment/cicd-demo-app --timeout=180s
+
+      - name: Show state
+        run: kubectl get pods,hpa
